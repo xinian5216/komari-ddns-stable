@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Komari DDNS</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 24px; color: #1f2937; background: #f8f9fa; }
+      .container { max-width: 1200px; margin: 0 auto; }
+      h2 { margin: 0 0 4px; font-size: 22px; font-weight: 600; color: #111827; }
+      .sub { color: #6b7280; font-size: 14px; margin-bottom: 18px; }
+      .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+      .left { display: flex; gap: 10px; align-items: center; }
+      button { border: none; border-radius: 6px; padding: 8px 16px; font-size: 14px; cursor: pointer; font-weight: 500; }
+      button.primary { background: #f97316; color: #fff; }
+      button.primary:hover { background: #ea580c; }
+      button.secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+      button.secondary:hover { background: #f9fafb; }
+      button.danger { background: #fff; color: #dc2626; border: 1px solid #fecaca; }
+      button.danger:hover { background: #fef2f2; }
+      button:disabled { opacity: .6; cursor: default; }
+      .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      thead th { text-align: left; padding: 12px 16px; color: #6b7280; font-weight: 600; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+      thead th:first-child { border-top-left-radius: 8px; }
+      thead th:last-child { border-top-right-radius: 8px; }
+      tbody td { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+      tbody tr:hover { background: #f9fafb; }
+      tbody tr:last-child td { border-bottom: none; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+      .name { color: #111827; font-weight: 500; }
+      .type { color: #4b5563; }
+      .ip { color: #059669; font-weight: 500; }
+      .empty-cell { color: #9ca3af; }
+      .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 3px 10px; border-radius: 999px; background: #f3f4f6; color: #4b5563; }
+      .tag.proxied { background: #fff7ed; color: #c2410c; }
+      .tag .cloud { width: 14px; height: 14px; fill: currentColor; }
+      .actions { display: flex; gap: 8px; }
+      .actions button { padding: 6px 12px; font-size: 13px; }
+      .edit-btn { color: #2563eb; background: transparent; border: none; }
+      .edit-btn:hover { background: #eff6ff; }
+      .delete-btn { color: #dc2626; background: transparent; border: none; }
+      .delete-btn:hover { background: #fef2f2; }
+      .empty { padding: 40px; text-align: center; color: #6b7280; font-size: 14px; }
+      .msg { min-height: 20px; margin-bottom: 14px; font-size: 14px; }
+      .msg.ok { color: #059669; }
+      .msg.err { color: #dc2626; }
+
+      /* Edit panel */
+      .edit-panel { padding: 20px; margin-bottom: 16px; }
+      .edit-title { font-size: 16px; font-weight: 600; margin: 0 0 16px; color: #111827; }
+      .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+      .field { display: flex; flex-direction: column; gap: 6px; }
+      .field label { font-size: 13px; font-weight: 600; color: #374151; }
+      .field input[type=text], .field input[type=number], .field select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; color: #111827; background: #fff; }
+      .field input::placeholder { color: #9ca3af; }
+      .field select[multiple] { height: 90px; }
+      .field small { color: #6b7280; font-size: 12px; font-weight: 400; }
+      .toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+      .toggle input { display: none; }
+      .switch { width: 40px; height: 22px; border-radius: 999px; background: #d1d5db; position: relative; transition: background .2s; }
+      .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }
+      .toggle input:checked + .switch { background: #f97316; }
+      .toggle input:checked + .switch::after { transform: translateX(18px); }
+      .toggle-text { font-size: 14px; color: #374151; display: inline-flex; align-items: center; gap: 6px; }
+      .edit-actions { display: flex; gap: 10px; margin-top: 20px; }
+      .hidden { display: none; }
+      .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+      .tab { background: transparent; border: none; padding: 10px 18px; font-size: 14px; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; border-radius: 0; font-weight: 500; }
+      .tab:hover { color: #374151; }
+      .tab.active { color: #111827; font-weight: 600; border-bottom-color: #f97316; }
+      .log-toolbar { display: flex; gap: 10px; align-items: center; padding: 16px; flex-wrap: wrap; border-bottom: 1px solid #f3f4f6; }
+      .log-toolbar select, .log-toolbar input { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; color: #111827; background: #fff; }
+      .log-toolbar .hint { color: #6b7280; font-size: 13px; }
+      .act { font-size: 12px; padding: 2px 10px; border-radius: 999px; font-weight: 600; display: inline-block; }
+      .act.create { background: #ecfdf5; color: #059669; }
+      .act.update { background: #eff6ff; color: #2563eb; }
+      .act.skip { background: #f3f4f6; color: #6b7280; }
+      .act.error { background: #fef2f2; color: #dc2626; }
+      .act.sync { background: #eef2ff; color: #4338ca; }
+      .act.delete { background: #fef2f2; color: #dc2626; }
+      .act.add { background: #f0fdf4; color: #16a34a; }
+      .act.edit { background: #fffbeb; color: #d97706; }
+      .detail-err { color: #dc2626; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Komari DDNS</h2>
+      <div class="sub">根据 Komari 节点上报的公网 IP 自动更新 Cloudflare DNS 记录</div>
+
+      <div class="toolbar">
+        <div class="left">
+          <button id="add" class="primary">+ 添加记录</button>
+          <button id="sync" class="secondary">立即同步全部</button>
+        </div>
+        <div id="msg" class="msg"></div>
+      </div>
+
+      <div id="editPanel" class="card edit-panel hidden">
+        <div id="editTitle" class="edit-title">添加记录</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>名称</label>
+            <input type="text" id="fName" placeholder="home.example.com" />
+          </div>
+          <div class="field">
+            <label>类型</label>
+            <select id="fType">
+              <option value="A">A</option>
+              <option value="AAAA">AAAA</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>来源节点 <small>（记录将使用此节点上报的公网 IP）</small></label>
+            <select id="fSource"></select>
+          </div>
+          <div class="field">
+            <label>代理状态</label>
+            <label class="toggle">
+              <input type="checkbox" id="fProxied" />
+              <span class="switch"></span>
+              <span class="toggle-text">
+                <svg class="cloud" viewBox="0 0 24 24"><path d="M18.5 10.5c-.4 0-.7 0-1.1.1-.6-2.4-2.8-4.1-5.4-4.1-2.9 0-5.3 2.1-5.8 4.9-.3-.1-.7-.1-1-.1-2.5 0-4.5 2-4.5 4.5s2 4.5 4.5 4.5h13c2.5 0 4.5-2 4.5-4.5s-2-4.7-4.5-4.7z"/></svg>
+                <span id="proxyText">未代理</span>
+              </span>
+            </label>
+          </div>
+          <div class="field">
+            <label>TTL <small>（秒）</small></label>
+            <input type="number" id="fTtl" value="60" min="1" />
+          </div>
+          <div class="field">
+            <label>备注</label>
+            <input type="text" id="fComment" placeholder="可选" />
+          </div>
+        </div>
+        <div class="edit-actions">
+          <button id="save" class="primary">保存</button>
+          <button id="cancel" class="secondary">取消</button>
+          <button id="delEdit" class="danger hidden">删除</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button id="tabRecords" class="tab active">记录</button>
+        <button id="tabLogs" class="tab">日志</button>
+      </div>
+
+      <div id="listPanel" class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>类型</th>
+              <th>来源节点</th>
+              <th>代理状态</th>
+              <th>TTL</th>
+              <th>内容</th>
+              <th>备注</th>
+              <th style="width:120px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="listBody"></tbody>
+        </table>
+        <div id="empty" class="empty hidden">暂无记录，点击「添加记录」开始配置。</div>
+      </div>
+
+      <div id="logPanel" class="card hidden">
+        <div class="log-toolbar">
+          <select id="logRecord"><option value="">全部记录</option></select>
+          <input type="number" id="logLimit" value="100" min="1" max="1000" style="width:90px" />
+          <span class="hint">条（最多 1000）</span>
+          <button id="logRefresh" class="secondary">刷新</button>
+          <button id="logClear" class="danger">清空日志</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>记录</th>
+              <th>类型</th>
+              <th>操作</th>
+              <th>详情</th>
+            </tr>
+          </thead>
+          <tbody id="logBody"></tbody>
+        </table>
+        <div id="logEmpty" class="empty hidden">暂无日志。</div>
+      </div>
+    </div>
+
+    <script>
+      var RECORDS_URL = "/cf-ddns/records";
+      var NODES_URL = "/cf-ddns/nodes";
+      var STATUS_URL = "/cf-ddns/status";
+      var SYNC_URL = "/cf-ddns/sync";
+
+      var NODES = [];
+      var records = [];
+      var state = {};
+      var editingIndex = -1;
+
+      var CLOUD_SVG = '<svg class="cloud" viewBox="0 0 24 24"><path d="M18.5 10.5c-.4 0-.7 0-1.1.1-.6-2.4-2.8-4.1-5.4-4.1-2.9 0-5.3 2.1-5.8 4.9-.3-.1-.7-.1-1-.1-2.5 0-4.5 2-4.5 4.5s2 4.5 4.5 4.5h13c2.5 0 4.5-2 4.5-4.5s-2-4.7-4.5-4.7z"/></svg>';
+
+      function el(tag, cls, text){
+        var e = document.createElement(tag);
+        if(cls) e.className = cls;
+        if(text!==undefined) e.textContent = text;
+        return e;
+      }
+      function fmt(ts){ if(!ts) return "—"; try { return new Date(ts).toLocaleString(); } catch(e){ return ts; } }
+      function msg(text, cls){ var m = document.getElementById("msg"); m.textContent = text || ""; m.className = "msg " + (cls||""); }
+      function recordKey(name, type){ return name + "#" + type; }
+      function nodeName(uuid){ var n = NODES.find(function(x){ return x.uuid === uuid; }); return n ? n.name : uuid.slice(0,8); }
+
+      async function loadNodes(){
+        try { var r = await fetch(NODES_URL, { credentials: "same-origin" }); if(r.ok) NODES = await r.json(); }
+        catch(e){ NODES = []; }
+      }
+
+      async function loadState(){
+        try { var r = await fetch(STATUS_URL, { credentials: "same-origin" }); if(r.ok) state = await r.json(); else state = {}; }
+        catch(e){ state = {}; }
+      }
+
+      function sourceNodeText(uuids){
+        if(!uuids || uuids.length === 0) return el("span", "empty-cell", "—");
+        var names = uuids.map(nodeName);
+        return document.createTextNode(names.join(", "));
+      }
+
+      function proxiedTag(on){
+        var t = el("span", "tag " + (on ? "proxied" : ""), on ? "已代理" : "未代理");
+        t.innerHTML = CLOUD_SVG + (on ? "已代理" : "未代理");
+        return t;
+      }
+
+      function renderList(){
+        var tbody = document.getElementById("listBody");
+        var empty = document.getElementById("empty");
+        tbody.innerHTML = "";
+        if(records.length === 0){ empty.classList.remove("hidden"); return; }
+        empty.classList.add("hidden");
+        records.forEach(function(rec, i){
+          var tr = el("tr");
+          var key = recordKey(rec.record_name, rec.record_type);
+          var st = state[key] || {};
+
+          var tdName = el("td"); tdName.appendChild(el("span", "mono name", rec.record_name)); tr.appendChild(tdName);
+          var tdType = el("td"); tdType.appendChild(el("span", "type", rec.record_type)); tr.appendChild(tdType);
+          var tdSource = el("td"); tdSource.appendChild(sourceNodeText(rec.source_node)); tr.appendChild(tdSource);
+          var tdProxy = el("td"); tdProxy.appendChild(proxiedTag(rec.proxied)); tr.appendChild(tdProxy);
+          var tdTtl = el("td"); tdTtl.textContent = rec.ttl || 60; tr.appendChild(tdTtl);
+          var tdContent = el("td"); tdContent.appendChild(el("span", st.last_ip ? "mono ip" : "empty-cell", st.last_ip || "—")); tr.appendChild(tdContent);
+          var tdComment = el("td"); tdComment.textContent = rec.comment || "—"; tdComment.style.color = rec.comment ? "#374151" : "#9ca3af"; tr.appendChild(tdComment);
+
+          var tdAct = el("td");
+          var wrap = el("div", "actions");
+          var editBtn = el("button", "edit-btn", "编辑");
+          editBtn.onclick = function(){ startEdit(i); };
+          var delBtn = el("button", "delete-btn", "删除");
+          delBtn.onclick = function(){ if(confirm("确定删除这条记录？")){ records.splice(i,1); saveRecords(); } };
+          wrap.appendChild(editBtn); wrap.appendChild(delBtn);
+          tdAct.appendChild(wrap);
+          tr.appendChild(tdAct);
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      function fillSourceOptions(){
+        var sel = document.getElementById("fSource");
+        sel.innerHTML = "";
+        NODES.forEach(function(n){
+          var o = el("option"); o.value = n.uuid; o.textContent = n.name + " (" + n.uuid.slice(0,8) + ")";
+          sel.appendChild(o);
+        });
+      }
+
+      function startEdit(i){
+        editingIndex = i;
+        var isNew = i < 0;
+        var rec = isNew ? { record_name:"", record_type:"A", source_node:[], ttl:60, proxied:false, comment:"" } : records[i];
+        document.getElementById("editTitle").textContent = isNew ? "添加记录" : "编辑记录";
+        document.getElementById("fName").value = rec.record_name || "";
+        document.getElementById("fType").value = rec.record_type || "A";
+        document.getElementById("fTtl").value = rec.ttl || 60;
+        document.getElementById("fComment").value = rec.comment || "";
+        document.getElementById("fProxied").checked = !!rec.proxied;
+        updateProxyText();
+        fillSourceOptions();
+        var srcSel = document.getElementById("fSource");
+        srcSel.value = (rec.source_node && rec.source_node[0]) || "";
+        document.getElementById("delEdit").classList.toggle("hidden", isNew);
+        document.getElementById("editPanel").classList.remove("hidden");
+        document.getElementById("listPanel").classList.add("hidden");
+      }
+
+      function closeEdit(){
+        document.getElementById("editPanel").classList.add("hidden");
+        document.getElementById("listPanel").classList.remove("hidden");
+        editingIndex = -1;
+      }
+
+      function updateProxyText(){
+        var on = document.getElementById("fProxied").checked;
+        document.getElementById("proxyText").textContent = on ? "已代理" : "未代理";
+      }
+
+      function validate(rec){
+        if(!rec.record_name){ return "请输入记录名称"; }
+        if(!rec.record_name.includes(".")){ return "记录名称应为完整域名（FQDN）"; }
+        if(!rec.source_node || rec.source_node.length === 0){ return "请至少选择一个来源节点"; }
+        return null;
+      }
+
+      async function saveRecords(){
+        msg("保存中…");
+        try {
+          var r = await fetch(RECORDS_URL, { method:"PUT", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body: JSON.stringify(records) });
+          if(r.status === 401){ msg("未授权（请以管理员身份登录）", "err"); return; }
+          var d = await r.json();
+          if(d.error){ msg("保存失败: "+d.error, "err"); }
+          else {
+            var parts = ["记录已保存"];
+            if((d.added||0) > 0) parts.push("新增 "+d.added+" 条");
+            if((d.edited||0) > 0) parts.push("修改 "+d.edited+" 条");
+            if((d.removed||0) > 0) parts.push("删除 "+d.removed+" 条");
+            if((d.added||0) > 0 || (d.edited||0) > 0 || (d.removed||0) > 0) parts.push("共 "+d.total+" 条");
+            msg(parts.join("，"), "ok"); renderList(); closeEdit();
+          }
+        } catch(e){ msg("请求失败: "+e.message, "err"); }
+      }
+
+      document.getElementById("add").onclick = function(){ startEdit(-1); };
+      document.getElementById("cancel").onclick = closeEdit;
+      document.getElementById("fProxied").onchange = updateProxyText;
+
+      document.getElementById("save").onclick = function(){
+        var rec = {
+          record_name: document.getElementById("fName").value.trim(),
+          record_type: document.getElementById("fType").value,
+          source_node: Array.from(document.getElementById("fSource").selectedOptions).map(function(o){ return o.value; }),
+          ttl: Number(document.getElementById("fTtl").value) || 60,
+          proxied: document.getElementById("fProxied").checked,
+          comment: document.getElementById("fComment").value.trim() || undefined,
+        };
+        var err = validate(rec);
+        if(err){ msg(err, "err"); return; }
+        if(editingIndex >= 0){ records[editingIndex] = rec; }
+        else { records.push(rec); }
+        saveRecords();
+      };
+
+      document.getElementById("delEdit").onclick = function(){
+        if(editingIndex < 0) return;
+        if(!confirm("确定删除这条记录？")) return;
+        records.splice(editingIndex, 1);
+        saveRecords();
+      };
+
+      document.getElementById("sync").onclick = async function(){
+        var btn = document.getElementById("sync"); btn.disabled = true; msg("同步中…");
+        try {
+          var r = await fetch(SYNC_URL, { method:"POST", credentials:"same-origin" });
+          var d = await r.json();
+          if(d.error){ msg("同步失败: "+d.error, "err"); }
+          else {
+            var okCount = (d.records||[]).filter(function(x){ return !x.error && !x.skipped; }).length;
+            var parts = ["共 " + d.total + " 条"];
+            if (okCount > 0) parts.push("更新/创建 " + okCount + " 条");
+            if ((d.skipped||0) > 0) parts.push("跳过 " + d.skipped + " 条");
+            if ((d.errors||0) > 0) parts.push("失败 " + d.errors + " 条");
+            msg("完成：" + parts.join("，"), (d.errors?"err":"ok"));
+          }
+        } catch(e){ msg("请求失败: "+e.message, "err"); }
+        finally { btn.disabled = false; await loadState(); renderList(); }
+      };
+
+      var LOGS_URL = "/cf-ddns/logs";
+
+      function actLabel(a){ return ({ create:"创建", update:"更新", skip:"跳过", error:"错误", sync:"同步", delete:"删除", add:"新增", edit:"修改" })[a] || a; }
+
+      function switchTab(which){
+        var isLog = which === "logs";
+        document.getElementById("tabRecords").classList.toggle("active", !isLog);
+        document.getElementById("tabLogs").classList.toggle("active", isLog);
+        document.getElementById("listPanel").classList.toggle("hidden", isLog);
+        document.getElementById("logPanel").classList.toggle("hidden", !isLog);
+        document.getElementById("editPanel").classList.add("hidden");
+        if(isLog){ fillLogRecordFilter(); loadLogs(); }
+      }
+
+      function fillLogRecordFilter(){
+        var sel = document.getElementById("logRecord");
+        sel.innerHTML = '<option value="">全部记录</option>';
+        records.forEach(function(r){
+          var o = el("option");
+          o.value = r.record_name;
+          o.textContent = r.record_name + "#" + r.record_type;
+          sel.appendChild(o);
+        });
+      }
+
+      async function loadLogs(){
+        var rec = document.getElementById("logRecord").value;
+        var limit = document.getElementById("logLimit").value || 100;
+        var url = LOGS_URL + "?limit=" + encodeURIComponent(limit);
+        if(rec) url += "&record=" + encodeURIComponent(rec);
+        try {
+          var r = await fetch(url, { credentials: "same-origin" });
+          if(r.status === 401){ msg("未授权（请以管理员身份登录）", "err"); return; }
+          var d = await r.json();
+          renderLogs(d.logs || []);
+        } catch(e){ msg("加载日志失败: " + e.message, "err"); }
+      }
+
+      function renderLogs(logs){
+        var tbody = document.getElementById("logBody");
+        var empty = document.getElementById("logEmpty");
+        tbody.innerHTML = "";
+        if(logs.length === 0){ empty.classList.remove("hidden"); return; }
+        empty.classList.add("hidden");
+        logs.forEach(function(l){
+          var tr = el("tr");
+          var tdTime = el("td"); tdTime.textContent = fmt(l.time); tr.appendChild(tdTime);
+          var tdName = el("td"); tdName.appendChild(el("span", "mono name", l.record_name || "—")); tr.appendChild(tdName);
+          var tdType = el("td"); tdType.appendChild(el("span", "type", l.record_type || "")); tr.appendChild(tdType);
+          var tdAct = el("td"); tdAct.appendChild(el("span", "act " + l.action, actLabel(l.action))); tr.appendChild(tdAct);
+          var tdDetail = el("td"); tdDetail.className = l.action === "error" ? "detail-err" : ""; tdDetail.textContent = l.detail || ""; tr.appendChild(tdDetail);
+          tbody.appendChild(tr);
+        });
+      }
+
+      async function clearLogs(){
+        if(!confirm("确定清空所有日志？此操作不可恢复。")) return;
+        try {
+          var r = await fetch(LOGS_URL, { method: "DELETE", credentials: "same-origin" });
+          if(r.ok){ msg("日志已清空", "ok"); loadLogs(); }
+          else { msg("清空失败", "err"); }
+        } catch(e){ msg("请求失败: " + e.message, "err"); }
+      }
+
+      document.getElementById("tabRecords").onclick = function(){ switchTab("records"); };
+      document.getElementById("tabLogs").onclick = function(){ switchTab("logs"); };
+      document.getElementById("logRefresh").onclick = loadLogs;
+      document.getElementById("logClear").onclick = clearLogs;
+      document.getElementById("logRecord").onchange = loadLogs;
+      document.getElementById("logLimit").onchange = loadLogs;
+
+      async function init(){
+        await loadNodes();
+        try {
+          var r = await fetch(RECORDS_URL, { credentials:"same-origin" });
+          if(r.ok){ var d = await r.json(); if(Array.isArray(d)) records = d; }
+        } catch(e){ records = []; }
+        await loadState();
+        renderList();
+        fillLogRecordFilter();
+      }
+      init();
+    </script>
+  </body>
+</html>
