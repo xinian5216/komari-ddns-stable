@@ -10,7 +10,7 @@
     "en": "Automatically update Cloudflare DNS records from the public IP reported by a Komari node, providing dynamic DNS."
   },
   "author": "穿云箭",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "komari": ">=1.4.0",
   "entry": "script.js",
   "permissions": {

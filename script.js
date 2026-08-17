@@ -1046,6 +1046,9 @@
         if (q.record) {
           logs = logs.filter((l) => l.record_name === q.record);
         }
+        if (q.action) {
+          logs = logs.filter((l) => l.action === q.action);
+        }
         const limit = parseInt(q.limit || "100", 10);
         const n = isNaN(limit) || limit <= 0 ? 100 : Math.min(limit, 1e3);
         const out = logs.slice(-n).reverse();

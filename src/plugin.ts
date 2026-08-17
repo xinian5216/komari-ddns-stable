@@ -755,7 +755,7 @@ definePlugin({
       jsonResponse(res, { ok: true, total: clean.length, added, removed, edited });
     });
 
-    // Query the sync operation log. Supports ?record=<name>&limit=<n>.
+    // Query the sync operation log. Supports ?record=<name>&action=<action>&limit=<n>.
     server.route("GET", "/cf-ddns/logs", (req: any, res: any) => {
       if (!isAdmin(req)) {
         res.statusCode = 401;
@@ -766,6 +766,9 @@ definePlugin({
       let logs = loadLogs();
       if (q.record) {
         logs = logs.filter((l) => l.record_name === q.record);
+      }
+      if (q.action) {
+        logs = logs.filter((l) => l.action === q.action);
       }
       const limit = parseInt(q.limit || "100", 10);
       const n = isNaN(limit) || limit <= 0 ? 100 : Math.min(limit, 1000);

@@ -171,6 +171,7 @@
       <div id="logPanel" class="card hidden">
         <div class="log-toolbar">
           <select id="logRecord"><option value="">全部记录</option></select>
+          <select id="logAction"><option value="">全部操作</option></select>
           <input type="number" id="logLimit" value="100" min="1" max="1000" style="width:90px" />
           <span class="hint">条（最多 1000）</span>
           <button id="logRefresh" class="secondary">刷新</button>
@@ -391,29 +392,62 @@
         document.getElementById("listPanel").classList.toggle("hidden", isLog);
         document.getElementById("logPanel").classList.toggle("hidden", !isLog);
         document.getElementById("editPanel").classList.add("hidden");
-        if(isLog){ fillLogRecordFilter(); loadLogs(); }
+        if(isLog){ fillLogActionFilter(); loadLogs(); }
       }
 
-      function fillLogRecordFilter(){
+      function fillLogRecordFilter(logs){
         var sel = document.getElementById("logRecord");
+        var prev = sel.value;
         sel.innerHTML = '<option value="">全部记录</option>';
-        records.forEach(function(r){
+        var names = new Set();
+        // Include current records and records seen in logs (e.g. deleted ones).
+        records.forEach(function(r){ names.add(r.record_name); });
+        (logs || []).forEach(function(l){ if(l.record_name) names.add(l.record_name); });
+        Array.from(names).sort().forEach(function(name){
           var o = el("option");
-          o.value = r.record_name;
-          o.textContent = r.record_name + "#" + r.record_type;
+          o.value = name;
+          o.textContent = name;
           sel.appendChild(o);
         });
+        sel.value = prev;
+      }
+
+      function fillLogActionFilter(){
+        var sel = document.getElementById("logAction");
+        var prev = sel.value;
+        var actions = [
+          { k: "create", label: "创建" },
+          { k: "update", label: "更新" },
+          { k: "skip", label: "跳过" },
+          { k: "error", label: "错误" },
+          { k: "sync", label: "同步" },
+          { k: "delete", label: "删除" },
+          { k: "add", label: "新增" },
+          { k: "edit", label: "修改" }
+        ];
+        sel.innerHTML = '<option value="">全部操作</option>';
+        actions.forEach(function(a){
+          var o = el("option");
+          o.value = a.k;
+          o.textContent = a.label;
+          sel.appendChild(o);
+        });
+        sel.value = prev;
       }
 
       async function loadLogs(){
         var rec = document.getElementById("logRecord").value;
+        var act = document.getElementById("logAction").value;
         var limit = document.getElementById("logLimit").value || 100;
         var url = LOGS_URL + "?limit=" + encodeURIComponent(limit);
         if(rec) url += "&record=" + encodeURIComponent(rec);
+        if(act) url += "&action=" + encodeURIComponent(act);
         try {
           var r = await fetch(url, { credentials: "same-origin" });
           if(r.status === 401){ msg("未授权（请以管理员身份登录）", "err"); return; }
           var d = await r.json();
+          // Refresh filter options with record names seen in the full log set.
+          fillLogRecordFilter(d.logs || []);
           renderLogs(d.logs || []);
         } catch(e){ msg("加载日志失败: " + e.message, "err"); }
       }
@@ -449,6 +483,7 @@
       document.getElementById("logRefresh").onclick = loadLogs;
       document.getElementById("logClear").onclick = clearLogs;
       document.getElementById("logRecord").onchange = loadLogs;
+      document.getElementById("logAction").onchange = loadLogs;
       document.getElementById("logLimit").onchange = loadLogs;
 
       async function init(){
