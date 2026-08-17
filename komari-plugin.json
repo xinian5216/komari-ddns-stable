@@ -10,7 +10,7 @@
     "en": "Automatically update Cloudflare DNS records from the public IP reported by a Komari node, providing dynamic DNS."
   },
   "author": "穿云箭",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "komari": ">=1.4.0",
   "entry": "script.js",
   "permissions": {
@@ -29,8 +29,8 @@
         "type": "string",
         "required": true,
         "help": {
-          "zh_CN": "需具备 Zone:DNS:Edit 权限的全局 Token；若某条记录单独指定 api_token 则优先使用",
-          "en": "Global API Token with Zone:DNS:Edit. A per-record api_token overrides this."
+          "zh_CN": "需具备 Zone:DNS:Edit 权限的全局 Cloudflare API Token，所有记录共用该 Token",
+          "en": "Global Cloudflare API Token with Zone:DNS:Edit permission, shared by all records."
         }
       },
       {

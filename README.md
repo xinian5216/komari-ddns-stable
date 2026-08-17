@@ -16,7 +16,7 @@
 
 | 配置 | 说明 |
 | --- | --- |
-| `api_token` | 全局 Cloudflare API Token（需 `Zone:DNS:Edit` 权限）；某条记录单独指定 `api_token` 时优先使用 |
+| `api_token` | 全局 Cloudflare API Token（需 `Zone:DNS:Edit` 权限），所有记录共用 |
 | `interval` | 检查间隔（分钟，默认 5） |
 | `notify` | 更新/创建时是否发送 Komari 通知 |
 
@@ -33,7 +33,7 @@
 | `ttl` | 否 | TTL（秒，默认 60） |
 | `proxied` | 否 | 是否启用 Cloudflare 代理（橙色云），默认 `false` |
 | `comment` | 否 | 备注，仅在管理页展示，不参与同步 |
-| `api_token` | 否 | 覆盖全局 Token |
+| `api_token` | 否 | 预留字段（记录不单独设置，统一使用全局 Token） |
 
 ## 开发
 
