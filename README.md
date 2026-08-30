@@ -16,7 +16,7 @@
 
 | 配置 | 说明 |
 | --- | --- |
-| `api_token` | 全局 Cloudflare API Token（需 `Zone:DNS:Edit` 权限），所有记录共用 |
+| `api_token` | 全局 Cloudflare API Token（需 `Zone:DNS:Edit` 权限），默认所有记录共用 |
 | `interval` | 检查间隔（分钟，默认 5） |
 | `notify` | 更新/创建时是否发送 Komari 通知 |
 
@@ -30,10 +30,10 @@
 | `record_name` | 是 | 记录名称（FQDN，如 `home.example.com`） |
 | `record_type` | 否 | `A` 或 `AAAA`，默认 `A` |
 | `source_node` | 否 | 节点 UUID；记录所用的来源节点（单节点） |
-| `ttl` | 否 | TTL（秒，默认 60） |
+| `ttl` | 否 | TTL；`1` 表示「自动」（默认），其余可选 60/120/300/600/900/1800/3600/7200/18000/43200/86400（秒） |
 | `proxied` | 否 | 是否启用 Cloudflare 代理（橙色云），默认 `false` |
 | `comment` | 否 | 备注，仅在管理页展示，不参与同步 |
-| `api_token` | 否 | 预留字段（记录不单独设置，统一使用全局 Token） |
+| `api_token` | 否 | 可选；填写则覆盖该记录全局 `api_token`（仅建议通过直接编辑 `records.json` 设置，管理页表单不暴露此字段，前端读取时一律脱敏） |
 
 ## 开发
 

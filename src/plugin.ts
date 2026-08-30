@@ -93,6 +93,23 @@ function saveRecords(arr: RecordConfig[]): void {
   fs.writeFileSync(RECORDS_FILE, JSON.stringify(arr, null, 2));
 }
 
+// Mask sentinels used when returning records to the admin frontend. The real
+// `api_token` is never sent to the browser; a record that has one is marked
+// with TOKEN_SET so the editor can preserve it on save without leaking it.
+const TOKEN_SET = "***SET***";
+
+// Return a copy safe to expose to the frontend: the per-record `api_token`, if
+// present, is replaced with TOKEN_SET; otherwise the field is omitted.
+function publicRecord(r: RecordConfig): RecordConfig {
+  const out: RecordConfig = { ...r };
+  if (r.api_token) {
+    out.api_token = TOKEN_SET;
+  } else {
+    delete out.api_token;
+  }
+  return out;
+}
+
 // Resolve the active record list: prefer the managed storage file, and seed it
 // once from the legacy `records` config textbox if storage is empty.
 function getRecords(config: PluginConfig): RecordConfig[] {
@@ -132,7 +149,7 @@ function parseRecords(config: PluginConfig): RecordConfig[] | { error: string } 
     source_node: Array.isArray(r.source_node)
       ? r.source_node.map((x: any) => String(x))
       : [],
-    ttl: Number(r.ttl) || 60,
+    ttl: Number(r.ttl) || 1,
     proxied: !!r.proxied,
     comment: r.comment ? String(r.comment) : undefined,
     api_token: r.api_token ? String(r.api_token) : undefined,
@@ -396,7 +413,7 @@ async function syncRecord(
     type: rec.record_type,
     name: rec.record_name,
     content: target.ip,
-    ttl: rec.ttl || 60,
+    ttl: rec.ttl || 1,
     proxied: !!rec.proxied,
   };
 
@@ -663,7 +680,7 @@ definePlugin({
         return;
       }
       const config = (await server.getConfig()) as unknown as PluginConfig;
-      jsonResponse(res, getRecords(config));
+      jsonResponse(res, getRecords(config).map(publicRecord));
     });
 
     // Save the entire record list (add/edit/delete handled client-side).
@@ -684,24 +701,63 @@ definePlugin({
         jsonResponse(res, { error: "记录必须是 JSON 数组" }, 400);
         return;
       }
-      const clean = arr.map((r: any) => ({
-        zone_id: String(r.zone_id || ""),
-        record_name: String(r.record_name || ""),
-        record_type: (r.record_type === "AAAA" ? "AAAA" : "A") as "A" | "AAAA",
-        source_node: Array.isArray(r.source_node)
-          ? r.source_node.map((x: any) => String(x))
-          : [],
-        ttl: Number(r.ttl) || 60,
-        proxied: !!r.proxied,
-        comment: r.comment ? String(r.comment) : undefined,
-        api_token: r.api_token ? String(r.api_token) : undefined,
-      }));
-      // Detect additions and deletions by diffing against the previously stored records.
+
+      // Load the previously stored records so we can validate and preserve the
+      // (frontend-hidden) per-record api_token across edits.
       const oldRecs = loadRecords();
       const oldMap = new Map<string, any>();
       oldRecs.forEach((r: any) =>
         oldMap.set(recordKey(r.record_name, r.record_type), r),
       );
+
+      // Validate every record server-side; never trust the client.
+      for (let i = 0; i < arr.length; i++) {
+        const r = arr[i] || {};
+        const name = String(r.record_name || "").trim();
+        if (!name) {
+          jsonResponse(res, { error: `第 ${i + 1} 条记录缺少 record_name` }, 400);
+          return;
+        }
+        if (!name.includes(".")) {
+          jsonResponse(
+            res,
+            { error: `第 ${i + 1} 条记录的 record_name 不是合法域名：${name}` },
+            400,
+          );
+          return;
+        }
+      }
+
+      const clean = arr.map((r: any) => {
+        const key = recordKey(String(r.record_name || ""), r.record_type === "AAAA" ? "AAAA" : "A");
+        let token: string | undefined;
+        if (r.api_token && String(r.api_token) !== TOKEN_SET) {
+          // A real token was supplied (e.g. direct storage edit); keep it.
+          token = String(r.api_token);
+        } else if (String(r.api_token) === TOKEN_SET) {
+          // Frontend echoed the mask back — preserve the stored token.
+          const ex = oldMap.get(key);
+          token = ex ? ex.api_token : undefined;
+        } else {
+          // No token in payload — keep whatever was stored before.
+          const ex = oldMap.get(key);
+          token = ex ? ex.api_token : undefined;
+        }
+        return {
+          zone_id: String(r.zone_id || ""),
+          record_name: String(r.record_name || ""),
+          record_type: (r.record_type === "AAAA" ? "AAAA" : "A") as "A" | "AAAA",
+          source_node: Array.isArray(r.source_node)
+            ? r.source_node.map((x: any) => String(x))
+            : [],
+          ttl: Number(r.ttl) || 1,
+          proxied: !!r.proxied,
+          comment: r.comment ? String(r.comment) : undefined,
+          api_token: token,
+        };
+      });
+
+      // Detect additions and deletions by diffing against the previously stored records.
       const oldKeys = new Set(oldMap.keys());
       const newKeys = new Set(
         clean.map((r: any) => recordKey(r.record_name, r.record_type)),

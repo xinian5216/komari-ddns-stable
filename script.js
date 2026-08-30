@@ -493,6 +493,16 @@
   function saveRecords(arr) {
     fs.writeFileSync(RECORDS_FILE, JSON.stringify(arr, null, 2));
   }
+  var TOKEN_SET = "***SET***";
+  function publicRecord(r) {
+    const out = { ...r };
+    if (r.api_token) {
+      out.api_token = TOKEN_SET;
+    } else {
+      delete out.api_token;
+    }
+    return out;
+  }
   function getRecords(config) {
     const stored = loadRecords();
     if (stored.length > 0) return stored;
@@ -949,7 +959,7 @@
           return;
         }
         const config = await import_plugin_sdk.server.getConfig();
-        (0, import_plugin_sdk.jsonResponse)(res, getRecords(config));
+        (0, import_plugin_sdk.jsonResponse)(res, getRecords(config).map(publicRecord));
       });
       import_plugin_sdk.server.route("PUT", "/cf-ddns/records", async (req, res) => {
         if (!isAdmin(req)) {
@@ -968,21 +978,50 @@
           (0, import_plugin_sdk.jsonResponse)(res, { error: "\u8BB0\u5F55\u5FC5\u987B\u662F JSON \u6570\u7EC4" }, 400);
           return;
         }
-        const clean = arr.map((r) => ({
-          zone_id: String(r.zone_id || ""),
-          record_name: String(r.record_name || ""),
-          record_type: r.record_type === "AAAA" ? "AAAA" : "A",
-          source_node: Array.isArray(r.source_node) ? r.source_node.map((x) => String(x)) : [],
-          ttl: Number(r.ttl) || 60,
-          proxied: !!r.proxied,
-          comment: r.comment ? String(r.comment) : void 0,
-          api_token: r.api_token ? String(r.api_token) : void 0
-        }));
         const oldRecs = loadRecords();
         const oldMap = /* @__PURE__ */ new Map();
         oldRecs.forEach(
           (r) => oldMap.set(recordKey(r.record_name, r.record_type), r)
         );
+        for (let i = 0; i < arr.length; i++) {
+          const r = arr[i] || {};
+          const name = String(r.record_name || "").trim();
+          if (!name) {
+            (0, import_plugin_sdk.jsonResponse)(res, { error: `\u7B2C ${i + 1} \u6761\u8BB0\u5F55\u7F3A\u5C11 record_name` }, 400);
+            return;
+          }
+          if (!name.includes(".")) {
+            (0, import_plugin_sdk.jsonResponse)(
+              res,
+              { error: `\u7B2C ${i + 1} \u6761\u8BB0\u5F55\u7684 record_name \u4E0D\u662F\u5408\u6CD5\u57DF\u540D\uFF1A${name}` },
+              400
+            );
+            return;
+          }
+        }
+        const clean = arr.map((r) => {
+          const key = recordKey(String(r.record_name || ""), r.record_type === "AAAA" ? "AAAA" : "A");
+          let token;
+          if (r.api_token && String(r.api_token) !== TOKEN_SET) {
+            token = String(r.api_token);
+          } else if (String(r.api_token) === TOKEN_SET) {
+            const ex = oldMap.get(key);
+            token = ex ? ex.api_token : void 0;
+          } else {
+            const ex = oldMap.get(key);
+            token = ex ? ex.api_token : void 0;
+          }
+          return {
+            zone_id: String(r.zone_id || ""),
+            record_name: String(r.record_name || ""),
+            record_type: r.record_type === "AAAA" ? "AAAA" : "A",
+            source_node: Array.isArray(r.source_node) ? r.source_node.map((x) => String(x)) : [],
+            ttl: Number(r.ttl) || 60,
+            proxied: !!r.proxied,
+            comment: r.comment ? String(r.comment) : void 0,
+            api_token: token
+          };
+        });
         const oldKeys = new Set(oldMap.keys());
         const newKeys = new Set(
           clean.map((r) => recordKey(r.record_name, r.record_type))
