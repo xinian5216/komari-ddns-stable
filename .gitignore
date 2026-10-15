@@ -2,3 +2,6 @@ node_modules/
 dist/
 komari.local.json
 .workbuddy/
+
+# Local verification reports
+*.audit.json

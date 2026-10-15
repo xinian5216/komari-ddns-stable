@@ -168,8 +168,8 @@ async function resolveTargetIp(
       continue;
     }
     const st = ctx.statuses[uuid];
-    if (st && st.online === false) {
-      console.log(`[cf-ddns] node ${node.name} (${uuid}) is offline, skipping`);
+    if (!st || st.online !== true) {
+      console.log(`[cf-ddns] node ${node.name} (${uuid}) has no confirmed online status, skipping`);
       continue;
     }
     const ip = recordType === "AAAA" ? node.ipv6 : node.ipv4;
@@ -534,10 +534,10 @@ async function syncOnce(): Promise<Record<string, any>> {
       uuids: Array.from(uuids),
     })) as Record<string, any>;
   } catch (e) {
-    console.warn(
-      "[cf-ddns] getNodesLatestStatus failed, continuing without online check:",
-      e,
-    );
+    const error = "无法确认节点在线状态，本轮未修改 DNS";
+    console.warn("[cf-ddns] node status unavailable; DNS sync stopped");
+    logSync({}, "error", false, error);
+    return { ok: false, error, records: [] };
   }
 
   const ctx: SyncContext = { nodes, statuses };

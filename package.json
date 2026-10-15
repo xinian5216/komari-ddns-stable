@@ -1,24 +1,27 @@
 {
   "name": "komari-plugin-cf-ddns",
-  "version": "0.1.3",
+  "version": "0.1.4-stable.1",
   "private": true,
   "description": "Cloudflare DDNS plugin for Komari — sync a node's reported public IP to a Cloudflare DNS record",
   "scripts": {
     "check": "komari-plugin-dev check",
     "build": "komari-plugin-dev build",
-    "pack": "komari-plugin-dev build && komari-plugin-dev pack && node scripts/rename-pack.js",
+    "pack": "npm run build && node scripts/package.cjs",
     "typecheck": "tsc --noEmit",
     "plugin:install": "komari-plugin-dev install --enable",
-    "dev": "komari-plugin-dev dev"
+    "dev": "komari-plugin-dev dev",
+    "test": "node --test test/*.test.cjs",
+    "verify": "npm run typecheck && npm run pack && npm test"
   },
   "komari": {
     "source": "src/plugin.ts"
   },
   "dependencies": {
-    "@komari-monitor/plugin-sdk": "^1.4.3"
+    "@komari-monitor/plugin-sdk": "1.4.3"
   },
   "devDependencies": {
-    "@komari-monitor/plugin-dev": "^1.4.3",
-    "typescript": "^5.0.0"
+    "@komari-monitor/plugin-dev": "1.4.3",
+    "typescript": "5.9.3",
+    "archiver": "7.0.1"
   }
 }

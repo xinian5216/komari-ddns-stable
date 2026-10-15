@@ -1,3 +1,15 @@
+# Komari DDNS Stable
+
+Maintenance fork of [yunjianj/Komari-DDNS](https://github.com/yunjianj/Komari-DDNS), authored by 穿云箭. Original MIT license and history are preserved. See UPSTREAM.md.
+
+This release stops DNS updates when the selected node is not confirmed online or the status query fails. Existing short cf-ddns, records and configuration remain compatible. See SECURITY.md before installation and back up the database and data/plugin-data/cf-ddns/.
+
+Build: Node.js 22, npm ci, npm run verify. Published ZIP and SHA256SUMS are under dist/.
+
+Maintained source: https://raw.githubusercontent.com/xinian5216/komari-stable/stable/plugin-market/v1.json (available after catalog publication).
+
+---
+
 # Komari DDNS 插件
 
 > ⚠️ **免责声明**：本项目由 AI 辅助完成，按「现状」提供，**风险自负**。作者不对因使用本插件造成的任何问题（包括但不限于 DNS 配置错误、解析异常、服务中断、数据泄露等）承担任何责任。请在充分理解代码的前提下于测试环境中自行验证后再用于生产环境。

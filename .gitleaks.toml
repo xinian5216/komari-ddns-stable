@@ -1,0 +1,6 @@
+title = "Plugin Stable secret scan"
+[extend]
+useDefault = true
+[[allowlists]]
+description = "Dependencies and uncommitted packages; extracted release files are scanned separately"
+paths = ['''(^|/)node_modules/''', '''(^|/)dist/''', '''(^|/)komari-host/''']

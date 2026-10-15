@@ -535,7 +535,7 @@
       record_name: String(r.record_name || ""),
       record_type: r.record_type === "AAAA" ? "AAAA" : "A",
       source_node: Array.isArray(r.source_node) ? r.source_node.map((x) => String(x)) : [],
-      ttl: Number(r.ttl) || 60,
+      ttl: Number(r.ttl) || 1,
       proxied: !!r.proxied,
       comment: r.comment ? String(r.comment) : void 0,
       api_token: r.api_token ? String(r.api_token) : void 0
@@ -549,8 +549,8 @@
         continue;
       }
       const st = ctx.statuses[uuid];
-      if (st && st.online === false) {
-        console.log(`[cf-ddns] node ${node.name} (${uuid}) is offline, skipping`);
+      if (!st || st.online !== true) {
+        console.log(`[cf-ddns] node ${node.name} (${uuid}) has no confirmed online status, skipping`);
         continue;
       }
       const ip = recordType === "AAAA" ? node.ipv6 : node.ipv4;
@@ -735,7 +735,7 @@
       type: rec.record_type,
       name: rec.record_name,
       content: target.ip,
-      ttl: rec.ttl || 60,
+      ttl: rec.ttl || 1,
       proxied: !!rec.proxied
     };
     const st = loadState();
@@ -836,10 +836,10 @@
         uuids: Array.from(uuids)
       });
     } catch (e) {
-      console.warn(
-        "[cf-ddns] getNodesLatestStatus failed, continuing without online check:",
-        e
-      );
+      const error = "\u65E0\u6CD5\u786E\u8BA4\u8282\u70B9\u5728\u7EBF\u72B6\u6001\uFF0C\u672C\u8F6E\u672A\u4FEE\u6539 DNS";
+      console.warn("[cf-ddns] node status unavailable; DNS sync stopped");
+      logSync({}, "error", false, error);
+      return { ok: false, error, records: [] };
     }
     const ctx = { nodes, statuses };
     const results = [];
@@ -1016,7 +1016,7 @@
             record_name: String(r.record_name || ""),
             record_type: r.record_type === "AAAA" ? "AAAA" : "A",
             source_node: Array.isArray(r.source_node) ? r.source_node.map((x) => String(x)) : [],
-            ttl: Number(r.ttl) || 60,
+            ttl: Number(r.ttl) || 1,
             proxied: !!r.proxied,
             comment: r.comment ? String(r.comment) : void 0,
             api_token: token
