@@ -472,9 +472,22 @@
     }
     return {};
   }
+  function writeJSONAtomic(file, value) {
+    const temporary = file + ".tmp";
+    try {
+      fs.writeFileSync(temporary, JSON.stringify(value, null, 2));
+      fs.renameSync(temporary, file);
+    } catch (error) {
+      try {
+        if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+      } catch {
+      }
+      throw error;
+    }
+  }
   function saveState(state) {
     try {
-      fs.writeFileSync(storageFile(), JSON.stringify(cleanState(state), null, 2));
+      writeJSONAtomic(storageFile(), cleanState(state));
     } catch (e) {
       console.error("[cf-ddns] save state failed:", e);
     }
@@ -491,7 +504,7 @@
     return [];
   }
   function saveRecords(arr) {
-    fs.writeFileSync(RECORDS_FILE, JSON.stringify(arr, null, 2));
+    writeJSONAtomic(RECORDS_FILE, arr);
   }
   var TOKEN_SET = "***SET***";
   function publicRecord(r) {
@@ -735,7 +748,7 @@
       type: rec.record_type,
       name: rec.record_name,
       content: target.ip,
-      ttl: rec.ttl || 1,
+      ttl: rec.proxied ? 1 : rec.ttl || 1,
       proxied: !!rec.proxied
     };
     const st = loadState();
@@ -758,14 +771,15 @@
       const wantProxied = !!rec.proxied;
       const ipChanged = record.content !== target.ip;
       const proxiedChanged = record.proxied !== wantProxied;
-      if (!ipChanged && !proxiedChanged) {
+      const ttlChanged = Number(record.ttl) !== payload.ttl;
+      if (!ipChanged && !proxiedChanged && !ttlChanged) {
         console.log(
           `[cf-ddns] [${rec.record_name}] already points to ${target.ip} (proxied=${wantProxied}), no change`
         );
         result.updated = false;
         result.skipped = "no change";
         result.current_ip = target.ip;
-        logSync(rec, "skip", true, "IP \u4E0E\u4EE3\u7406\u72B6\u6001\u5747\u65E0\u53D8\u5316");
+        logSync(rec, "skip", true, "IP\u3001\u4EE3\u7406\u72B6\u6001\u4E0E TTL \u5747\u65E0\u53D8\u5316");
       } else {
         try {
           await cloudflareUpdate(token, zoneId, record.id, payload);
@@ -778,7 +792,7 @@
             rec,
             "update",
             true,
-            `\u66F4\u65B0 DNS \u8BB0\u5F55 \u2192 ${target.ip}${proxiedChanged ? "\uFF08\u4EE3\u7406\u72B6\u6001\u53D8\u66F4\uFF09" : ""}`,
+            `\u66F4\u65B0 DNS \u8BB0\u5F55 \u2192 ${target.ip}${proxiedChanged ? "\uFF08\u4EE3\u7406\u72B6\u6001\u53D8\u66F4\uFF09" : ""}${ttlChanged ? "\uFF08TTL \u53D8\u66F4\uFF09" : ""}`,
             target.ip
           );
         } catch (e) {
@@ -818,7 +832,16 @@
       console.warn("[cf-ddns] notify failed:", e);
     }
   }
-  async function syncOnce() {
+  var syncInFlight = null;
+  function syncOnce() {
+    if (!syncInFlight) {
+      syncInFlight = performSync().finally(() => {
+        syncInFlight = null;
+      });
+    }
+    return syncInFlight;
+  }
+  async function performSync() {
     const config = await import_plugin_sdk.server.getConfig();
     const list = getRecords(config);
     if (list.length === 0) {
@@ -1022,6 +1045,12 @@
             api_token: token
           };
         });
+        try {
+          saveRecords(clean);
+        } catch {
+          (0, import_plugin_sdk.jsonResponse)(res, { error: "\u8BB0\u5F55\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u5B58\u50A8\u540E\u91CD\u8BD5" }, 500);
+          return;
+        }
         const oldKeys = new Set(oldMap.keys());
         const newKeys = new Set(
           clean.map((r) => recordKey(r.record_name, r.record_type))
@@ -1071,7 +1100,6 @@
             logSync(r, "delete", true, `\u5220\u9664\u8BB0\u5F55 ${r.record_name} (${r.record_type})`);
           }
         });
-        saveRecords(clean);
         (0, import_plugin_sdk.jsonResponse)(res, { ok: true, total: clean.length, added, removed, edited });
       });
       import_plugin_sdk.server.route("GET", "/cf-ddns/logs", (req, res) => {

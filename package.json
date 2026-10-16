@@ -1,6 +1,6 @@
 {
   "name": "komari-plugin-cf-ddns",
-  "version": "0.1.4-stable.1",
+  "version": "0.1.5-stable.1",
   "private": true,
   "description": "Cloudflare DDNS plugin for Komari — sync a node's reported public IP to a Cloudflare DNS record",
   "scripts": {

@@ -13,5 +13,9 @@ async function __runMaintainedPluginChecks(){
  __testStatus=true;
  const success=await __request('POST','/cf-ddns/sync',{},true);
  __assert(success.data.ok===true&&__externalCalls===2,'Confirmed online node no longer updates DNS');
+ const saved=await __request('PUT','/cf-ddns/records',[{...record,ttl:300}],true);
+ __assert(saved.status===200,'Goja could not atomically replace records');
+ __assert(JSON.parse(fs.readFileSync(path.join(__storageDir__,'records.json'),'utf8'))[0].ttl===300,'Goja lost saved TTL');
+ __assert(!fs.existsSync(path.join(__storageDir__,'records.json.tmp')),'Temporary records file left after save');
  return true;
 }
