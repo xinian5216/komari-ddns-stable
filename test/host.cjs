@@ -6,9 +6,9 @@ const quiet = {log(){},warn(){},error(){}};
 module.exports = function host(options={}) {
  const directory = options.directory || path.resolve(__dirname,'..');
  const storage = path.join(directory,'virtual-test-storage');
- const files = new Map(); const routes = new Map(); const calls = []; const external=[];
+ const files = new Map(); const routes = new Map(); const calls = []; const external=[]; const writes=[]; const renames=[];
  let now = Date.now();
- const fakefs={existsSync:p=>files.has(p),readFileSync:(p,encoding)=>p.startsWith(storage)?files.get(p):fs.readFileSync(p,encoding),writeFileSync:(p,v)=>files.set(p,String(v)),renameSync:(a,b)=>{files.set(b,files.get(a));files.delete(a);},unlinkSync:p=>files.delete(p)};
+ const fakefs={existsSync:p=>files.has(p),readFileSync:(p,encoding)=>p.startsWith(storage)?files.get(p):fs.readFileSync(p,encoding),writeFileSync:(p,v)=>{writes.push(p);if(options.failRecordsWrite&&/records\.json(?:\.tmp)?$/.test(p)){files.set(p,'{"interrupted":');throw Error('simulated interrupted write');}files.set(p,String(v));},renameSync:(a,b)=>{renames.push([a,b]);if(options.failRename)throw Error('simulated rename failure');files.set(b,files.get(a));files.delete(a);},unlinkSync:p=>files.delete(p)};
  const server={getConfig:async()=>options.config||{},route:(m,p,h)=>routes.set(m+' '+p,h),injectHTML(){},cron(){},call:async(method,args)=>{
   calls.push({method,args});
   if(method==='admin:dbQuery')return {rows:[['test-user','Audit']],row_count:1};
@@ -29,7 +29,7 @@ module.exports = function host(options={}) {
  }
  const context=vm.createContext({console:quiet,__dirname:directory,__storageDir__:storage,
   Date:class extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}},
-  fetch:async(url,init={})=>{external.push({url,method:init.method||'GET',body:init.body});return {json:async()=>({success:true,result:init.method==='PUT'?{}:[{id:'record',content:'198.51.100.3',proxied:false}]})};},
+  fetch:async(url,init={})=>{external.push({url,method:init.method||'GET',body:init.body});if(options.fetch)return options.fetch(url,init);return {json:async()=>({success:true,result:init.method==='PUT'?{}:[{id:'record',content:'198.51.100.3',proxied:false}]})};},
   require:name=>{
    if(name==='server')return server;
    if(name==='fs'||name==='node:fs')return fakefs;
@@ -47,5 +47,5 @@ module.exports = function host(options={}) {
   await handler(req,res);try{data=JSON.parse(data);}catch{}
   return {status:res.statusCode,data,headers:res.headers};
  }
- return {files,routes,calls,external,storage,request,core:runtimeModule.exports,load:()=>context.load(),advance:ms=>{now+=ms;},setFile:(name,value)=>files.set(path.join(storage,name),JSON.stringify(value)),getFile:name=>JSON.parse(files.get(path.join(storage,name)))};
+ return {files,routes,calls,external,writes,renames,storage,request,core:runtimeModule.exports,load:()=>context.load(),advance:ms=>{now+=ms;},setFile:(name,value)=>files.set(path.join(storage,name),JSON.stringify(value)),getFile:name=>JSON.parse(files.get(path.join(storage,name)))};
 };

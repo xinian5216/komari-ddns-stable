@@ -69,9 +69,22 @@ function loadState(): Record<string, any> {
   return {};
 }
 
+function writeJSONAtomic(file: string, value: unknown): void {
+  const temporary = file + ".tmp";
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(value, null, 2));
+    fs.renameSync(temporary, file);
+  } catch (error) {
+    try {
+      if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+    } catch {}
+    throw error;
+  }
+}
+
 function saveState(state: Record<string, any>): void {
   try {
-    fs.writeFileSync(storageFile(), JSON.stringify(cleanState(state), null, 2));
+    writeJSONAtomic(storageFile(), cleanState(state));
   } catch (e) {
     console.error("[cf-ddns] save state failed:", e);
   }
@@ -90,7 +103,7 @@ function loadRecords(): RecordConfig[] {
 }
 
 function saveRecords(arr: RecordConfig[]): void {
-  fs.writeFileSync(RECORDS_FILE, JSON.stringify(arr, null, 2));
+  writeJSONAtomic(RECORDS_FILE, arr);
 }
 
 // Mask sentinels used when returning records to the admin frontend. The real
@@ -413,7 +426,7 @@ async function syncRecord(
     type: rec.record_type,
     name: rec.record_name,
     content: target.ip,
-    ttl: rec.ttl || 1,
+    ttl: rec.proxied ? 1 : rec.ttl || 1,
     proxied: !!rec.proxied,
   };
 
@@ -438,14 +451,15 @@ async function syncRecord(
     const wantProxied = !!rec.proxied;
     const ipChanged = record.content !== target.ip;
     const proxiedChanged = record.proxied !== wantProxied;
-    if (!ipChanged && !proxiedChanged) {
+    const ttlChanged = Number(record.ttl) !== payload.ttl;
+    if (!ipChanged && !proxiedChanged && !ttlChanged) {
       console.log(
         `[cf-ddns] [${rec.record_name}] already points to ${target.ip} (proxied=${wantProxied}), no change`,
       );
       result.updated = false;
       result.skipped = "no change";
       result.current_ip = target.ip;
-      logSync(rec, "skip", true, "IP 与代理状态均无变化");
+      logSync(rec, "skip", true, "IP、代理状态与 TTL 均无变化");
     } else {
       try {
         await cloudflareUpdate(token, zoneId, record.id, payload);
@@ -460,7 +474,7 @@ async function syncRecord(
           true,
           `更新 DNS 记录 → ${target.ip}${
             proxiedChanged ? "（代理状态变更）" : ""
-          }`,
+          }${ttlChanged ? "（TTL 变更）" : ""}`,
           target.ip,
         );
       } catch (e) {
@@ -514,7 +528,16 @@ async function sendNotify(
   }
 }
 
-async function syncOnce(): Promise<Record<string, any>> {
+let syncInFlight: Promise<Record<string, any>> | null = null;
+
+function syncOnce(): Promise<Record<string, any>> {
+  if (!syncInFlight) {
+    syncInFlight = performSync().finally(() => { syncInFlight = null; });
+  }
+  return syncInFlight;
+}
+
+async function performSync(): Promise<Record<string, any>> {
   const config = (await server.getConfig()) as unknown as PluginConfig;
   const list = getRecords(config);
   if (list.length === 0) {
@@ -757,7 +780,14 @@ definePlugin({
         };
       });
 
-      // Detect additions and deletions by diffing against the previously stored records.
+      try {
+        saveRecords(clean);
+      } catch {
+        jsonResponse(res, { error: "记录保存失败，请检查存储后重试" }, 500);
+        return;
+      }
+
+      // Detect additions and deletions only after the records were saved.
       const oldKeys = new Set(oldMap.keys());
       const newKeys = new Set(
         clean.map((r: any) => recordKey(r.record_name, r.record_type)),
@@ -807,7 +837,6 @@ definePlugin({
           logSync(r, "delete", true, `删除记录 ${r.record_name} (${r.record_type})`);
         }
       });
-      saveRecords(clean);
       jsonResponse(res, { ok: true, total: clean.length, added, removed, edited });
     });
 

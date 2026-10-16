@@ -9,3 +9,5 @@ Releases require passing type checks, regression tests, production dependency au
 Use a Cloudflare API Token restricted to the necessary zones and DNS operations. Automatic zone discovery additionally needs zone-read capability. Database configuration, records.json and backups contain recoverable credentials and must remain private. A missing or offline node status now prevents DNS updates.
 
 Back up the Komari database and data/plugin-data/cf-ddns/ before switching versions. Use the same plugin short to preserve data; do not uninstall or delete its data as a migration step. Rollback by reinstalling a verified previous ZIP after backing up. Avoid reinstalling an official-source copy over this maintained version.
+
+New releases are assembled as drafts and published only after all verified assets are uploaded. GitHub immutable releases protect newly published tags and assets when enabled; previously published releases are not retroactively locked.

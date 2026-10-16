@@ -4,9 +4,11 @@ Maintenance fork of [yunjianj/Komari-DDNS](https://github.com/yunjianj/Komari-DD
 
 This release stops DNS updates when the selected node is not confirmed online or the status query fails. Existing short cf-ddns, records and configuration remain compatible. See SECURITY.md before installation and back up the database and data/plugin-data/cf-ddns/.
 
+TTL-only changes are synchronized as well. Cloudflare-proxied records use automatic TTL. Overlapping manual and scheduled sync requests share one operation. Records and state are replaced through temporary files; failed record saves return an error while retaining the previous records.
+
 Build: Node.js 22, npm ci, npm run verify. Published ZIP and SHA256SUMS are under dist/.
 
-Maintained source: https://raw.githubusercontent.com/xinian5216/komari-stable/stable/plugin-market/v1.json (available after catalog publication).
+Maintained source: https://raw.githubusercontent.com/xinian5216/komari-stable/stable/plugin-market/v1.json .
 
 ---
 
@@ -21,7 +23,7 @@ Maintained source: https://raw.githubusercontent.com/xinian5216/komari-stable/st
 1. 按设定间隔（`interval`，默认 5 分钟）触发一次同步；
 2. 遍历 `records` 中的每一条记录；对每条记录，取它指定的**来源节点**所上报的**在线**公网 IP（A 记录取 ipv4，AAAA 记录取 ipv6）；
 3. 读取该节点的 `ipv4`（`A` 记录）或 `ipv6`（`AAAA` 记录）；
-4. 调用 Cloudflare API 查询目标 DNS 记录，记录不存在则**自动创建**，存在但 IP 或橙色云状态不一致则**更新**；
+4. 调用 Cloudflare API 查询目标 DNS 记录，记录不存在则**自动创建**，存在但 IP、橙色云状态或 TTL 不一致则**更新**；橙色云记录使用自动 TTL；
 5. 每条记录的状态独立持久化到插件长期存储目录（`__storageDir__`），更新/创建时可选择发送通知。
 
 ## 配置项
